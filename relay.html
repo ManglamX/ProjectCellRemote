@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Project Cell Room Remote</title>
+  <style>
+    :root {
+      --primary-color: #6C63FF;
+      --secondary-color: #2A2A2A;
+      --accent-color: #FF6584;
+      --background-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: var(--background-gradient);
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: rgba(40, 40, 40, 0.9);
+      border-radius: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 2rem;
+      background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 1px;
+    }
+
+    .relay-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      padding: 1rem;
+    }
+
+    .relay-card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 1.5rem;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .relay-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .relay-button {
+      width: 100%;
+      padding: 1.2rem;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(108, 99, 255, 0.1);
+      color: #fff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .relay-button::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .relay-button:hover::before {
+      opacity: 0.1;
+    }
+
+    .relay-button.on {
+      background: rgba(76, 175, 80, 0.15);
+      color: #4CAF50;
+    }
+
+    .relay-button.off {
+      background: rgba(244, 67, 54, 0.15);
+      color: #F44336;
+    }
+
+    .status-bar {
+      text-align: center;
+      margin-top: 2rem;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .control-buttons {
+      text-align: center;
+      margin-top: 2rem;
+    }
+
+    .control-buttons button {
+      padding: 1rem 2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 0 1rem;
+      background: var(--primary-color);
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+
+    .control-buttons button:hover {
+      background: var(--accent-color);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+        margin: 1rem;
+      }
+      
+      .relay-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Project Cell Room Remote</h1>
+    <div class="relay-grid" id="relays"></div>
+    <div class="control-buttons">
+      <button onclick="toggleAllRelays(true)">Turn All On</button>
+      <button onclick="toggleAllRelays(false)">Turn All Off</button>
+    </div>
+    <div class="status-bar" id="status">Connected to Firebase</div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEY0PkSE2QvW2td546L4Tt-OIuV3iViEk",
+      authDomain: "vc02-3c2c3.firebaseapp.com",
+      databaseURL: "https://vc02-3c2c3-default-rtdb.firebaseio.com",
+      projectId: "vc02-3c2c3",
+      storageBucket: "vc02-3c2c3.appspot.com",
+      messagingSenderId: "653475925834",
+      appId: "1:653475925834:web:94a0a3b57edc4c005dfbb3",
+      measurementId: "G-LSY1NZ689Z"
+    };
+    
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref('relays');
+
+    // Create relay cards
+    for (let i = 1; i <= 8; i++) {
+      const relay = document.createElement('div');
+      relay.className = 'relay-card';
+      relay.innerHTML = `
+        <button class="relay-button" id="relay${i}" onclick="toggleRelay(${i})">
+          Relay ${i}<br><span class="status">OFF</span>
+        </button>
+      `;
+      document.getElementById('relays').appendChild(relay);
+    }
+
+    // Update button states from Firebase
+    db.on('value', (snapshot) => {
+      const states = snapshot.val();
+      for (let i = 1; i <= 8; i++) {
+        const btn = document.getElementById(`relay${i}`);
+        const status = btn.querySelector('.status');
+        const state = states[`relay${i}`];
+        
+        btn.classList.remove('on', 'off');
+        btn.classList.add(state ? 'on' : 'off');
+        status.textContent = state ? 'ON' : 'OFF';
+      }
+    });
+
+    function toggleRelay(relayNum) {
+      const relayRef = db.child(`relay${relayNum}`);
+      relayRef.once('value', (snapshot) => {
+        relayRef.set(!snapshot.val());
+      });
+    }
+
+    function toggleAllRelays(state) {
+      for (let i = 1; i <= 8; i++) {
+        const relayRef = db.child(`relay${i}`);
+        relayRef.set(state);
+      }
+    }
+  </script>
+</body>
+</html>
